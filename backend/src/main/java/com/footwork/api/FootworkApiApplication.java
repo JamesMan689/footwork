@@ -1,0 +1,13 @@
+package com.footwork.api;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class FootworkApiApplication {
+
+	public static void main(String[] args) {
+		SpringApplication.run(FootworkApiApplication.class, args);
+	}
+
+}
