@@ -39,6 +39,12 @@ public class UserInfoService implements UserDetailsService {
       throw new RuntimeException("Email already exists");
     }
     userInfo.setPassword(passwordEncoder.encode(userInfo.getPassword()));
+    
+    // Set default role if not provided
+    if (userInfo.getRoles() == null || userInfo.getRoles().trim().isEmpty()) {
+      userInfo.setRoles("ROLE_USER");
+    }
+    
     repository.save(userInfo);
     return "user added to system";
   }
