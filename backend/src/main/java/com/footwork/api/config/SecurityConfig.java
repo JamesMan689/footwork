@@ -46,6 +46,9 @@ public class SecurityConfig {
                 // Public drill endpoints (read-only)
                 .requestMatchers("/api/drills/**").permitAll()
                 
+                // Public dashboard endpoints
+                .requestMatchers("/api/dashboard/**").permitAll()
+                
                 // Role-based endpoints
                 .requestMatchers("/api/user/**").hasAuthority("ROLE_USER")
                 .requestMatchers("/api/auth/admin/**").hasAuthority("ROLE_ADMIN")

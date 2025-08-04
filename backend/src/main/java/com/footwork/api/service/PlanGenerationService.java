@@ -74,36 +74,40 @@ public class PlanGenerationService {
         List<Drill> allDrills = drillRepository.findAll();
         System.out.println("Total drills in database: " + allDrills.size());
 
+        // Track selected drill IDs to prevent duplicates
+        Set<Long> selectedDrillIds = new HashSet<>();
+
         // Generate warmup drills (10 minutes for all levels)
-        List<PlanDrill> warmupDrills = generateWarmupDrills(dailyPlan, allDrills, orderIndex);
+        List<PlanDrill> warmupDrills = generateWarmupDrills(dailyPlan, allDrills, orderIndex, selectedDrillIds);
         planDrills.addAll(warmupDrills);
         orderIndex += warmupDrills.size();
 
         // Generate fitness drills (only for advanced level, always 5 minutes)
         if ("ADVANCED".equals(user.getExperienceLevel().toUpperCase())) {
-            List<PlanDrill> fitnessDrills = generateFitnessDrills(dailyPlan, allDrills, orderIndex);
+            List<PlanDrill> fitnessDrills = generateFitnessDrills(dailyPlan, allDrills, orderIndex, selectedDrillIds);
             planDrills.addAll(fitnessDrills);
             orderIndex += fitnessDrills.size();
         }
 
         // Generate core drills based on user's position and level
-        List<PlanDrill> coreDrills = generateCoreDrills(dailyPlan, allDrills, user, orderIndex);
+        List<PlanDrill> coreDrills = generateCoreDrills(dailyPlan, allDrills, user, orderIndex, selectedDrillIds);
         planDrills.addAll(coreDrills);
 
         // Generate cooldown drills (5 minutes for all levels)
-        List<PlanDrill> cooldownDrills = generateCooldownDrills(dailyPlan, allDrills, orderIndex);
+        List<PlanDrill> cooldownDrills = generateCooldownDrills(dailyPlan, allDrills, orderIndex, selectedDrillIds);
         planDrills.addAll(cooldownDrills);
 
         return planDrills;
     }
 
-    private List<PlanDrill> generateWarmupDrills(DailyPlan dailyPlan, List<Drill> allDrills, int startOrder) {
+    private List<PlanDrill> generateWarmupDrills(DailyPlan dailyPlan, List<Drill> allDrills, int startOrder, Set<Long> selectedDrillIds) {
         List<PlanDrill> warmupDrills = new ArrayList<>();
         
-        // Filter warmup drills based on type column
+        // Filter warmup drills based on type column, excluding already selected drills
         List<Drill> warmupCandidates = allDrills.stream()
                 .filter(drill -> drill.getType() != null && 
-                        drill.getType().equalsIgnoreCase("warmup"))
+                        drill.getType().equalsIgnoreCase("warmup") &&
+                        !selectedDrillIds.contains(drill.getId()))
                 .collect(Collectors.toList());
 
         System.out.println("Warmup drills found: " + warmupCandidates.size());
@@ -118,18 +122,20 @@ public class PlanGenerationService {
             planDrill.setDuration(10); // Fixed 10 minutes
             planDrill.setSection("WARMUP");
             warmupDrills.add(planDrill);
+            selectedDrillIds.add(selectedDrill.getId()); // Track selected drill
         }
 
         return warmupDrills;
     }
 
-    private List<PlanDrill> generateFitnessDrills(DailyPlan dailyPlan, List<Drill> allDrills, int startOrder) {
+    private List<PlanDrill> generateFitnessDrills(DailyPlan dailyPlan, List<Drill> allDrills, int startOrder, Set<Long> selectedDrillIds) {
         List<PlanDrill> fitnessDrills = new ArrayList<>();
         
-        // Filter fitness drills based on type column
+        // Filter fitness drills based on type column, excluding already selected drills
         List<Drill> fitnessCandidates = allDrills.stream()
                 .filter(drill -> drill.getType() != null && 
-                        drill.getType().equalsIgnoreCase("fitness"))
+                        drill.getType().equalsIgnoreCase("fitness") &&
+                        !selectedDrillIds.contains(drill.getId()))
                 .collect(Collectors.toList());
 
         System.out.println("Fitness drills found: " + fitnessCandidates.size());
@@ -144,18 +150,20 @@ public class PlanGenerationService {
             planDrill.setDuration(5); // Fixed 5 minutes
             planDrill.setSection("FITNESS");
             fitnessDrills.add(planDrill);
+            selectedDrillIds.add(selectedDrill.getId()); // Track selected drill
         }
 
         return fitnessDrills;
     }
 
-    private List<PlanDrill> generateCooldownDrills(DailyPlan dailyPlan, List<Drill> allDrills, int startOrder) {
+    private List<PlanDrill> generateCooldownDrills(DailyPlan dailyPlan, List<Drill> allDrills, int startOrder, Set<Long> selectedDrillIds) {
         List<PlanDrill> cooldownDrills = new ArrayList<>();
         
-        // Filter cooldown drills based on type column
+        // Filter cooldown drills based on type column, excluding already selected drills
         List<Drill> cooldownCandidates = allDrills.stream()
                 .filter(drill -> drill.getType() != null && 
-                        drill.getType().equalsIgnoreCase("cooldown"))
+                        drill.getType().equalsIgnoreCase("cooldown") &&
+                        !selectedDrillIds.contains(drill.getId()))
                 .collect(Collectors.toList());
 
         System.out.println("Cooldown drills found: " + cooldownCandidates.size());
@@ -170,13 +178,14 @@ public class PlanGenerationService {
             planDrill.setDuration(5); // Fixed 5 minutes
             planDrill.setSection("COOLDOWN");
             cooldownDrills.add(planDrill);
+            selectedDrillIds.add(selectedDrill.getId()); // Track selected drill
         }
 
         return cooldownDrills;
     }
 
     private List<PlanDrill> generateCoreDrills(DailyPlan dailyPlan, List<Drill> allDrills, 
-                                              UserInfo user, int startOrder) {
+                                              UserInfo user, int startOrder, Set<Long> selectedDrillIds) {
         List<PlanDrill> coreDrills = new ArrayList<>();
         int orderIndex = startOrder;
 
@@ -196,7 +205,12 @@ public class PlanGenerationService {
             for (int i = 0; i < count; i++) {
                 List<Drill> candidates = filterDrillsByType(allDrills, drillType, user.getPrimaryPosition());
                 
-                System.out.println("Found " + candidates.size() + " candidates for " + drillType);
+                // Filter out already selected drills
+                candidates = candidates.stream()
+                        .filter(drill -> !selectedDrillIds.contains(drill.getId()))
+                        .collect(Collectors.toList());
+                
+                System.out.println("Found " + candidates.size() + " candidates for " + drillType + " (after filtering duplicates)");
                 
                 if (!candidates.isEmpty()) {
                     Drill selectedDrill = getRandomDrill(candidates);
@@ -208,6 +222,7 @@ public class PlanGenerationService {
                     planDrill.setDuration(selectedDrill.getDuration()); // Use actual drill duration
                     planDrill.setSection("CORE");
                     coreDrills.add(planDrill);
+                    selectedDrillIds.add(selectedDrill.getId()); // Track selected drill
                     System.out.println("Added drill: " + selectedDrill.getName() + " (type: " + drillType + ")");
                 } else {
                     System.out.println("No drills found for type: " + drillType + " and position: " + user.getPrimaryPosition());
@@ -324,7 +339,7 @@ public class PlanGenerationService {
     }
 
     private int calculateTotalSessionDuration(List<PlanDrill> planDrills) {
-        // Calculate total duration from all drills (including warmup and cooldown)
+        // Calculate total duration from all drills 
         return planDrills.stream()
                 .mapToInt(PlanDrill::getDuration)
                 .sum();
@@ -341,9 +356,7 @@ public class PlanGenerationService {
         // Group drills by section
         List<PlanDrill> allPlanDrills = planDrillRepository.findByDailyPlanOrderByOrderIndex(dailyPlan);
         
-        // Recalculate session duration to ensure it includes warmup/cooldown
-        int totalDuration = calculateTotalSessionDuration(allPlanDrills);
-        response.setSessionDuration(totalDuration);
+        response.setSessionDuration(dailyPlan.getSessionDuration());
         
         response.setCompleted(dailyPlan.isCompleted());
         
