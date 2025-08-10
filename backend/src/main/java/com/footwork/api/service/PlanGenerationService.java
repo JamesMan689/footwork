@@ -61,6 +61,18 @@ public class PlanGenerationService {
         dailyPlan.setSessionDuration(totalDuration);
         dailyPlanRepository.save(dailyPlan);
 
+        // Keep only the latest plan for this user (delete older ones)
+        // We consider the plan list ordered by most recent date first; keep index 0
+        List<DailyPlan> userPlansDesc = dailyPlanRepository.findByUserOrderByPlanDateDesc(user);
+        if (userPlansDesc.size() > 1) {
+            // Delete drills for older plans first to avoid FK issues
+            for (int i = 1; i < userPlansDesc.size(); i++) {
+                planDrillRepository.deleteByDailyPlan(userPlansDesc.get(i));
+            }
+            // Then delete the older plans themselves
+            dailyPlanRepository.deleteAll(userPlansDesc.subList(1, userPlansDesc.size()));
+        }
+
         // Reload the plan with drills
         dailyPlan = dailyPlanRepository.findById(dailyPlan.getId()).orElse(dailyPlan);
         return convertToResponse(dailyPlan);

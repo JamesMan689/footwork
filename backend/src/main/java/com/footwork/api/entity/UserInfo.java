@@ -43,4 +43,7 @@ public class UserInfo {
   private String experienceLevel;
   private String primaryPosition;
   private boolean profileCompleted = false;
+
+  // URL to user's profile image
+  private String profileImageUrl;
 }

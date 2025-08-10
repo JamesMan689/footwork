@@ -3,15 +3,13 @@ package com.footwork.api.entity;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import java.time.LocalDate;
 
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class DailyTipResponse {
+public class DailyQuoteResponse {
     private Long id;
-    private String tip;
+    private String quote;
     private String author;
     private String category;
-    private LocalDate tipDate;
 } 

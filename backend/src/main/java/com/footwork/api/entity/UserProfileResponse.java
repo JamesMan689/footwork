@@ -16,4 +16,5 @@ public class UserProfileResponse {
     private String experienceLevel;
     private String primaryPosition;
     private boolean profileCompleted;
+    private String profileImageUrl;
 } 

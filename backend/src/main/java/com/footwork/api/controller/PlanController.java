@@ -6,6 +6,7 @@ import com.footwork.api.service.UserInfoService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -20,6 +21,7 @@ public class PlanController {
     private UserInfoService userInfoService;
 
     @PostMapping("/generate")
+    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<?> generateDailyPlan(Authentication authentication) {
         try {
             String userEmail = authentication.getName();
@@ -44,6 +46,7 @@ public class PlanController {
     }
 
     @GetMapping("/current")
+    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<?> getCurrentPlan(Authentication authentication) {
         try {
             String userEmail = authentication.getName();
@@ -65,6 +68,7 @@ public class PlanController {
     }
 
     @PostMapping("/{planId}/complete")
+    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<?> markPlanAsCompleted(@PathVariable Long planId, 
                                                Authentication authentication) {
         try {

@@ -1,7 +1,7 @@
 package com.footwork.api.controller;
 
-import com.footwork.api.entity.DailyTipResponse;
-import com.footwork.api.service.DailyTipService;
+import com.footwork.api.entity.DailyQuoteResponse;
+import com.footwork.api.service.DailyQuoteService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -12,13 +12,13 @@ import org.springframework.web.bind.annotation.*;
 public class DashboardController {
 
     @Autowired
-    private DailyTipService dailyTipService;
+    private DailyQuoteService dailyQuoteService;
 
-    @GetMapping("/tip")
-    public ResponseEntity<DailyTipResponse> getDailyTip() {
+    @GetMapping("/quote")
+    public ResponseEntity<DailyQuoteResponse> getDailyQuote() {
         try {
-            DailyTipResponse tip = dailyTipService.getDailyTip();
-            return ResponseEntity.ok(tip);
+            DailyQuoteResponse quote = dailyQuoteService.getDailyQuote();
+            return ResponseEntity.ok(quote);
         } catch (Exception e) {
             return ResponseEntity.badRequest().build();
         }
