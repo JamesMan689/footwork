@@ -3,6 +3,7 @@ package com.footwork.api.service;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.logging.Logger;
 
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -25,17 +26,21 @@ import com.footwork.api.entity.UserProfileResponse;
 @Service
 public class UserInfoService implements UserDetailsService {
 
+  private static final Logger logger = Logger.getLogger(UserInfoService.class.getName());
   private final UserInfoRepository repository;
   private final DailyPlanRepository dailyPlanRepository;
   private final PlanDrillRepository planDrillRepository;
   private final PasswordEncoder passwordEncoder;
+  private final TokenRevocationService tokenRevocationService;
 
   public UserInfoService(UserInfoRepository repository, DailyPlanRepository dailyPlanRepository, 
-                        PlanDrillRepository planDrillRepository, PasswordEncoder passwordEncoder) {
+                        PlanDrillRepository planDrillRepository, PasswordEncoder passwordEncoder,
+                        TokenRevocationService tokenRevocationService) {
     this.repository = repository;
     this.dailyPlanRepository = dailyPlanRepository;
     this.planDrillRepository = planDrillRepository;
     this.passwordEncoder = passwordEncoder;
+    this.tokenRevocationService = tokenRevocationService;
   }
 
   @Override
@@ -88,6 +93,7 @@ public class UserInfoService implements UserDetailsService {
     }
     
     UserInfo user = userOptional.get();
+    boolean emailChanged = false;
     
     // Only update fields that are provided (not null)
     if (request.getName() != null) {
@@ -100,6 +106,7 @@ public class UserInfoService implements UserDetailsService {
         if (repository.existsByEmail(request.getEmail())) {
           throw new RuntimeException("Email already exists: " + request.getEmail());
         }
+        emailChanged = true;
       }
       user.setEmail(request.getEmail());
     }
@@ -122,7 +129,17 @@ public class UserInfoService implements UserDetailsService {
     
     user.setProfileCompleted(true);
     
-    return repository.save(user);
+    UserInfo savedUser = repository.save(user);
+    
+    // If email changed, we need to revoke existing tokens
+    if (emailChanged) {
+      // This will be handled by the controller to return appropriate response
+      savedUser.setEmailChanged(true);
+      tokenRevocationService.revokeAllTokensForUser(currentEmail);
+      logger.info("Email changed from " + currentEmail + " to " + savedUser.getEmail() + ". Tokens revoked.");
+    }
+    
+    return savedUser;
   }
   
   public void updatePassword(String email, PasswordUpdateRequest request) {

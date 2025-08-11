@@ -52,4 +52,8 @@ public class UserInfo {
   // Streak tracking
   private Integer streak = 0;
   private LocalDate lastCompletedDate;
+  
+  // Transient field to track email changes during updates
+  @jakarta.persistence.Transient
+  private boolean emailChanged = false;
 }

@@ -33,6 +33,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.logging.Logger;
 import java.util.Date;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api")
@@ -291,14 +292,28 @@ public class UserController {
     
     @PutMapping("/user/update")
     @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<UserProfileResponse> updateUser(@RequestBody UserUpdateRequest request) {
+    public ResponseEntity<?> updateUser(@RequestBody UserUpdateRequest request) {
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             String email = authentication.getName();
             
             UserInfo updatedUser = service.updateUser(email, request);
+            
+            // Check if email was changed
+            if (updatedUser.isEmailChanged()) {
+                // Return special response indicating email change and need for re-login
+                return ResponseEntity.ok(Map.of(
+                    "message", "Profile updated successfully. Email changed. Please login again with your new email.",
+                    "emailChanged", true,
+                    "newEmail", updatedUser.getEmail(),
+                    "requiresReLogin", true
+                ));
+            }
+            
+            // Normal response for non-email changes
             UserProfileResponse safeUser = service.toUserProfileResponse(updatedUser);
             return ResponseEntity.ok(safeUser);
+            
         } catch (Exception e) {
             logger.warning("Update user error: " + e.getMessage());
             return ResponseEntity.badRequest().build();

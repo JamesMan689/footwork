@@ -37,6 +37,22 @@ public class TokenRevocationService {
         return revokedTokens.get(token);
     }
     
+    public int getRevokedTokenCount() {
+        return revokedTokens.size();
+    }
+    
+    // Revoke all tokens for a specific user (when email changes)
+    public void revokeAllTokensForUser(String email) {
+        // Note: In a production system, you might want to track user-token mappings
+        // For now, we'll log this action. In a real implementation, you'd want to:
+        // 1. Store user-token mappings in the database
+        // 2. Revoke all active tokens for that user
+        // 3. Force logout on all devices
+        
+        logger.info("Email changed for user: " + email + ". All existing tokens should be invalidated.");
+        logger.info("Note: Implement user-token mapping in production for proper token revocation.");
+    }
+    
     // Clean up old revoked tokens (for memory management)
     public void cleanupOldRevokedTokens() {
         long currentTime = System.currentTimeMillis();
@@ -59,9 +75,5 @@ public class TokenRevocationService {
         logger.info("Running scheduled cleanup of revoked tokens. Current count: " + revokedTokens.size());
         cleanupOldRevokedTokens();
         logger.info("Scheduled cleanup completed. Current count: " + revokedTokens.size());
-    }
-    
-    public int getRevokedTokenCount() {
-        return revokedTokens.size();
     }
 } 
