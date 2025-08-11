@@ -12,6 +12,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
+
 @Entity
 @Data
 @AllArgsConstructor
@@ -46,4 +48,8 @@ public class UserInfo {
 
   // URL to user's profile image
   private String profileImageUrl;
+  
+  // Streak tracking
+  private Integer streak = 0;
+  private LocalDate lastCompletedDate;
 }

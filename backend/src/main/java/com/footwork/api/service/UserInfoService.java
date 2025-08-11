@@ -1,5 +1,6 @@
 package com.footwork.api.service;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -194,7 +195,9 @@ public class UserInfoService implements UserDetailsService {
       user.getExperienceLevel(),
       user.getPrimaryPosition(),
       user.isProfileCompleted(),
-      user.getProfileImageUrl()
+      user.getProfileImageUrl(),
+      user.getStreak(),
+      user.getLastCompletedDate() != null ? user.getLastCompletedDate().toString() : null
     );
   }
 
@@ -207,5 +210,29 @@ public class UserInfoService implements UserDetailsService {
     UserInfo user = userOptional.get();
     user.setProfileImageUrl(profileImageUrl);
     return repository.save(user);
+  }
+
+  @Transactional
+  public void updateUserStreak(UserInfo user) {
+    LocalDate today = LocalDate.now();
+    
+    if (user.getLastCompletedDate() == null) {
+      // First time completing a plan
+      user.setStreak(1);
+      user.setLastCompletedDate(today);
+    } else if (user.getLastCompletedDate().equals(today.minusDays(1))) {
+      // Consecutive day - increment streak
+      user.setStreak(user.getStreak() + 1);
+      user.setLastCompletedDate(today);
+    } else if (user.getLastCompletedDate().equals(today)) {
+      // Already completed today - no change
+      return;
+    } else {
+      // Streak broken - reset to 1
+      user.setStreak(1);
+      user.setLastCompletedDate(today);
+    }
+    
+    repository.save(user);
   }
 }

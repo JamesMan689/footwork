@@ -21,8 +21,11 @@ public class PlanGenerationService {
     @Autowired
     private DailyPlanRepository dailyPlanRepository;
 
-    @Autowired
+        @Autowired
     private PlanDrillRepository planDrillRepository;
+
+    @Autowired
+    private UserInfoService userInfoService;
 
     @Transactional
     public DailyPlanResponse generateDailyPlan(UserInfo user, PlanGenerationRequest request) {
@@ -411,6 +414,8 @@ public class PlanGenerationService {
         return plan.map(this::convertToResponse).orElse(null);
     }
 
+
+
     public void markPlanAsCompleted(Long planId) {
         Optional<DailyPlan> plan = dailyPlanRepository.findById(planId);
         if (plan.isPresent()) {
@@ -419,6 +424,28 @@ public class PlanGenerationService {
             dailyPlanRepository.save(dailyPlan);
         }
     }
+
+    public void markPlanAsCompleted(Long planId, UserInfo user) {
+        Optional<DailyPlan> plan = dailyPlanRepository.findById(planId);
+        if (plan.isPresent()) {
+            DailyPlan dailyPlan = plan.get();
+            
+            // Security check: Ensure the plan belongs to the authenticated user
+            if (dailyPlan.getUser().getId() != user.getId()) {
+                throw new SecurityException("You can only mark your own plans as completed");
+            }
+            
+            dailyPlan.setCompleted(true);
+            dailyPlanRepository.save(dailyPlan);
+            
+            // Update user streak
+            userInfoService.updateUserStreak(user);
+        } else {
+            throw new RuntimeException("Plan not found");
+        }
+    }
+
+
 
 
 } 

@@ -69,7 +69,7 @@ public class PlanController {
 
     @PostMapping("/{planId}/complete")
     @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<?> markPlanAsCompleted(@PathVariable Long planId, 
+    public ResponseEntity<?> markPlanCompleted(@PathVariable Long planId,
                                                Authentication authentication) {
         try {
             String userEmail = authentication.getName();
@@ -79,12 +79,15 @@ public class PlanController {
                 return ResponseEntity.badRequest().body("User not found");
             }
 
-            planGenerationService.markPlanAsCompleted(planId);
+            planGenerationService.markPlanAsCompleted(planId, user);
             return ResponseEntity.ok().body("Plan marked as completed");
+        } catch (SecurityException e) {
+            return ResponseEntity.status(403).body("Access denied: " + e.getMessage());
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body("Error marking plan as completed: " + e.getMessage());
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Error completing plan: " + e.getMessage());
+            return ResponseEntity.badRequest().body("Error marking plan as completed: " + e.getMessage());
         }
     }
-
 
 } 

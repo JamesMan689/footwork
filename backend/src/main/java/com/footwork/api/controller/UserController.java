@@ -9,6 +9,7 @@ import com.footwork.api.entity.UserProfileResponse;
 import com.footwork.api.entity.UserUpdateRequest;
 import com.footwork.api.entity.PasswordUpdateRequest;
 import com.footwork.api.entity.DeleteUserRequest;
+import com.footwork.api.entity.StreakResponse;
 import com.footwork.api.service.JwtService;
 import com.footwork.api.service.TokenRevocationService;
 import com.footwork.api.service.UserInfoService;
@@ -272,6 +273,29 @@ public class UserController {
         } catch (Exception e) {
             logger.warning("Delete user error: " + e.getMessage());
             return ResponseEntity.badRequest().body("User deletion failed: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/user/streak")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<StreakResponse> getUserStreak() {
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String email = authentication.getName();
+            
+            UserInfo user = service.getUserByEmail(email);
+            if (user == null) {
+                return ResponseEntity.badRequest().build();
+            }
+            
+            StreakResponse response = new StreakResponse();
+            response.setStreak(user.getStreak() != null ? user.getStreak() : 0);
+            response.setMessage("Current streak: " + response.getStreak() + " days");
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logger.warning("Get streak error: " + e.getMessage());
+            return ResponseEntity.badRequest().build();
         }
     }
 }

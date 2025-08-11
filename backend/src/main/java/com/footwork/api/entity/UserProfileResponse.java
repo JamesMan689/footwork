@@ -17,4 +17,6 @@ public class UserProfileResponse {
     private String primaryPosition;
     private boolean profileCompleted;
     private String profileImageUrl;
+    private Integer streak;
+    private String lastCompletedDate;
 } 
