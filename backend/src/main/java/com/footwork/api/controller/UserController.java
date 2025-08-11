@@ -32,6 +32,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.logging.Logger;
+import java.util.Date;
 
 @RestController
 @RequestMapping("/api")
@@ -135,8 +136,19 @@ public class UserController {
         logger.info("=== REFRESH ENDPOINT CALLED ===");
         logger.info("Refresh endpoint called with token: " + (refreshToken != null ? refreshToken.substring(0, Math.min(20, refreshToken.length())) + "..." : "null"));
         
-        if (refreshToken != null && refreshToken.startsWith("Bearer ")) {
-            String token = refreshToken.substring(7);
+        if (refreshToken == null || !refreshToken.startsWith("Bearer ")) {
+            logger.warning("Refresh called without valid Authorization header");
+            throw new UsernameNotFoundException("Authorization header required");
+        }
+        
+        String token = refreshToken.substring(7);
+        
+        try {
+            // First check if this is actually a refresh token
+            if (!jwtService.isRefreshToken(token)) {
+                logger.warning("Refresh attempted with non-refresh token");
+                throw new UsernameNotFoundException("Only refresh tokens are accepted for refresh");
+            }
             
             // Check if token is revoked
             boolean isRevoked = tokenRevocationService.isTokenRevoked(token);
@@ -164,7 +176,13 @@ public class UserController {
                     return new AuthResponse(newAccessToken, newRefreshToken, "Token refreshed successfully");
                 }
             }
+        } catch (UsernameNotFoundException e) {
+            throw e; // Re-throw UsernameNotFoundException
+        } catch (Exception e) {
+            logger.warning("Error during refresh: " + e.getMessage());
+            throw new UsernameNotFoundException("Invalid refresh token");
         }
+        
         throw new UsernameNotFoundException("Invalid refresh token!");
     }
 
@@ -172,16 +190,57 @@ public class UserController {
     public ResponseEntity<String> logout(@RequestHeader("Authorization") String refreshToken) {
         logger.info("Logout endpoint called with token: " + (refreshToken != null ? refreshToken.substring(0, Math.min(20, refreshToken.length())) + "..." : "null"));
         
-        if (refreshToken != null && refreshToken.startsWith("Bearer ")) {
-            String token = refreshToken.substring(7);
+        if (refreshToken == null || !refreshToken.startsWith("Bearer ")) {
+            logger.warning("Logout called without valid Authorization header");
+            return ResponseEntity.badRequest().body("Authorization header required");
+        }
+        
+        String token = refreshToken.substring(7);
+        
+        try {
+            // First check if this is actually a refresh token
+            if (!jwtService.isRefreshToken(token)) {
+                logger.warning("Logout attempted with non-refresh token");
+                return ResponseEntity.badRequest().body("Only refresh tokens are accepted for logout");
+            }
+            
+            // Validate the refresh token
+            String email = jwtService.extractUsername(token);
+            if (email == null) {
+                logger.warning("Invalid refresh token: could not extract email");
+                return ResponseEntity.badRequest().body("Invalid refresh token");
+            }
+            
+            // Check if token is expired
+            Date expiration = jwtService.extractExpiration(token);
+            if (expiration.before(new Date())) {
+                logger.warning("Refresh token expired for user: " + email);
+                return ResponseEntity.badRequest().body("Refresh token expired");
+            }
+            
+            // Load user details to validate the token
+            UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+            if (!jwtService.validateToken(token, userDetails)) {
+                logger.warning("Invalid refresh token: validation failed for user: " + email);
+                return ResponseEntity.badRequest().body("Invalid refresh token");
+            }
+            
+            // Check if token is already revoked
+            if (tokenRevocationService.isTokenRevoked(token)) {
+                logger.info("Token already revoked for user: " + email);
+                return ResponseEntity.ok("Logout successful");
+            }
             
             // Revoke the refresh token
             tokenRevocationService.revokeToken(token);
-            logger.info("Token revoked successfully");
+            logger.info("Token revoked successfully for user: " + email);
             
             return ResponseEntity.ok("Logout successful");
+            
+        } catch (Exception e) {
+            logger.warning("Error during logout: " + e.getMessage());
+            return ResponseEntity.badRequest().body("Invalid refresh token");
         }
-        return ResponseEntity.badRequest().body("Invalid refresh token");
     }
 
 

@@ -31,14 +31,47 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
+        String requestURI = request.getRequestURI();
+        
+        // Skip JWT validation for auth endpoints (they handle their own token validation)
+        if (requestURI.startsWith("/api/auth/")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+        
         String authHeader = request.getHeader("Authorization");
         String token = null;
         String email = null;
 
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             token = authHeader.substring(7);
-            email = jwtService.extractUsername(token);
-            System.out.println("JWT Filter - Request: " + request.getRequestURI() + ", Email: " + email);
+            
+            try {
+                // Check if this is an access token (not a refresh token)
+                if (jwtService.isRefreshToken(token)) {
+                    System.out.println("JWT Filter - Rejected refresh token for API access: " + requestURI);
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.getWriter().write("Access tokens only. Refresh tokens cannot be used for API access.");
+                    return;
+                }
+                
+                // Check if this is actually an access token
+                if (!jwtService.isAccessToken(token)) {
+                    System.out.println("JWT Filter - Rejected invalid token type for API access: " + requestURI);
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.getWriter().write("Invalid token type. Only access tokens are accepted for API access.");
+                    return;
+                }
+                
+                email = jwtService.extractUsername(token);
+                System.out.println("JWT Filter - Request: " + requestURI + ", Email: " + email);
+                
+            } catch (Exception e) {
+                System.out.println("JWT Filter - Token parsing error: " + e.getMessage());
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.getWriter().write("Invalid token format");
+                return;
+            }
         }
 
         if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
