@@ -14,6 +14,7 @@ import com.footwork.api.service.JwtService;
 import com.footwork.api.service.TokenRevocationService;
 import com.footwork.api.service.UserInfoService;
 import com.footwork.api.service.S3StorageService;
+import com.footwork.api.service.EmailVerificationService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -59,6 +60,9 @@ public class UserController {
 
     @Autowired
     private S3StorageService s3StorageService;
+
+    @Autowired
+    private EmailVerificationService emailVerificationService;
 
     @GetMapping("/auth/welcome")
     public String welcome() {
@@ -113,6 +117,7 @@ public class UserController {
             return ResponseEntity.badRequest().build();
         }
     }
+
     @PostMapping("/auth/register")
     public String register(@RequestBody UserInfo userInfo) {
         return service.addUser(userInfo);
@@ -244,8 +249,6 @@ public class UserController {
         }
     }
 
-
-    
     @PostMapping("/user/profile")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<ProfileSetupResponse> setupProfile(@RequestBody ProfileSetupRequest request) {
@@ -370,6 +373,44 @@ public class UserController {
         } catch (Exception e) {
             logger.warning("Get streak error: " + e.getMessage());
             return ResponseEntity.badRequest().build();
+        }
+    }
+
+    // Email verification endpoints
+    @PostMapping("/auth/send-verification")
+    public ResponseEntity<String> sendVerificationEmail(@RequestParam String email) {
+        try {
+            emailVerificationService.sendVerificationEmail(email);
+            return ResponseEntity.ok("Verification email sent successfully");
+        } catch (Exception e) {
+            logger.warning("Send verification email error: " + e.getMessage());
+            return ResponseEntity.badRequest().body("Failed to send verification email: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/auth/verify-email")
+    public ResponseEntity<String> verifyEmail(@RequestParam String code, @RequestParam String email) {
+        try {
+            boolean verified = emailVerificationService.verifyEmail(code, email);
+            if (verified) {
+                return ResponseEntity.ok("Email verified successfully");
+            } else {
+                return ResponseEntity.badRequest().body("Invalid or expired verification code");
+            }
+        } catch (Exception e) {
+            logger.warning("Verify email error: " + e.getMessage());
+            return ResponseEntity.badRequest().body("Email verification failed: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/auth/resend-verification")
+    public ResponseEntity<String> resendVerificationEmail(@RequestParam String email) {
+        try {
+            emailVerificationService.resendVerificationEmail(email);
+            return ResponseEntity.ok("Verification email resent successfully");
+        } catch (Exception e) {
+            logger.warning("Resend verification email error: " + e.getMessage());
+            return ResponseEntity.badRequest().body("Failed to resend verification email: " + e.getMessage());
         }
     }
 }

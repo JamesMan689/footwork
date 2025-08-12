@@ -41,9 +41,10 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
 
             // Configure endpoint authorization
-            .authorizeHttpRequests(auth -> auth
-                // Public endpoints
-                .requestMatchers("/api/auth/welcome", "/api/auth/register", "/api/auth/login", "/api/auth/logout", "/api/auth/refresh").permitAll()
+                            .authorizeHttpRequests(auth -> auth
+                    // Public endpoints
+                    .requestMatchers("/api/auth/welcome", "/api/auth/register", "/api/auth/login", "/api/auth/logout", "/api/auth/refresh", 
+                                  "/api/auth/send-verification", "/api/auth/verify-email", "/api/auth/resend-verification").permitAll()
                 
                 // Public drill endpoints (read-only)
                 .requestMatchers("/api/drills/**").permitAll()

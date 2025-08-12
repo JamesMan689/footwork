@@ -56,4 +56,11 @@ public class UserInfo {
   // Transient field to track email changes during updates
   @jakarta.persistence.Transient
   private boolean emailChanged = false;
+  
+  // Email verification fields
+  @jakarta.persistence.Column(name = "email_verified")
+  private boolean emailVerified = false;
+  
+  @jakarta.persistence.Column(name = "email_verified_at")
+  private LocalDate emailVerifiedAt;
 }

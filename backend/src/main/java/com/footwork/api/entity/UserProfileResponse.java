@@ -19,4 +19,6 @@ public class UserProfileResponse {
     private String profileImageUrl;
     private Integer streak;
     private String lastCompletedDate;
+    private boolean emailVerified;
+    private String emailVerifiedAt;
 } 

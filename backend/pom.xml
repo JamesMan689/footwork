@@ -104,6 +104,12 @@
             <artifactId>s3</artifactId>
         </dependency>
 
+        <!-- AWS SDK v2 for SES -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>ses</artifactId>
+        </dependency>
+
         <!-- Image resize/compress -->
         <dependency>
             <groupId>net.coobird</groupId>

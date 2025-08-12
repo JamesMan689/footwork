@@ -22,6 +22,11 @@ import com.footwork.api.repository.UserInfoRepository;
 import com.footwork.api.repository.DailyPlanRepository;
 import com.footwork.api.repository.PlanDrillRepository;
 import com.footwork.api.entity.UserProfileResponse;
+import com.footwork.api.service.JwtService;
+import com.footwork.api.service.PlanGenerationService;
+import com.footwork.api.service.S3StorageService;
+import com.footwork.api.service.TokenRevocationService;
+import com.footwork.api.service.EmailVerificationService;
 
 @Service
 public class UserInfoService implements UserDetailsService {
@@ -32,15 +37,17 @@ public class UserInfoService implements UserDetailsService {
   private final PlanDrillRepository planDrillRepository;
   private final PasswordEncoder passwordEncoder;
   private final TokenRevocationService tokenRevocationService;
+  private final EmailVerificationService emailVerificationService;
 
   public UserInfoService(UserInfoRepository repository, DailyPlanRepository dailyPlanRepository, 
                         PlanDrillRepository planDrillRepository, PasswordEncoder passwordEncoder,
-                        TokenRevocationService tokenRevocationService) {
+                        TokenRevocationService tokenRevocationService, EmailVerificationService emailVerificationService) {
     this.repository = repository;
     this.dailyPlanRepository = dailyPlanRepository;
     this.planDrillRepository = planDrillRepository;
     this.passwordEncoder = passwordEncoder;
     this.tokenRevocationService = tokenRevocationService;
+    this.emailVerificationService = emailVerificationService;
   }
 
   @Override
@@ -64,6 +71,12 @@ public class UserInfoService implements UserDetailsService {
     }
     
     repository.save(userInfo);
+    try {
+        emailVerificationService.sendVerificationEmail(userInfo.getEmail());
+    } catch (Exception e) {
+        logger.warning("Failed to send verification email: " + e.getMessage());
+        // Don't fail registration if email sending fails
+    }
     return "user added to system";
   }
 
@@ -214,7 +227,9 @@ public class UserInfoService implements UserDetailsService {
       user.isProfileCompleted(),
       user.getProfileImageUrl(),
       user.getStreak(),
-      user.getLastCompletedDate() != null ? user.getLastCompletedDate().toString() : null
+      user.getLastCompletedDate() != null ? user.getLastCompletedDate().toString() : null,
+      user.isEmailVerified(),
+      user.getEmailVerifiedAt() != null ? user.getEmailVerifiedAt().toString() : null
     );
   }
 
