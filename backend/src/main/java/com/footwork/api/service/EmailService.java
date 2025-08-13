@@ -91,7 +91,7 @@ public class EmailService {
                     <p>If you didn't create an account with Footwork, you can safely ignore this email.</p>
                     </div>
                     <div class="footer">
-                        <p>&copy; 2024 Footwork. All rights reserved.</p>
+                        <p>Thanks for using Footwork!</p>
                     </div>
                 </div>
             </body>
@@ -118,8 +118,6 @@ public class EmailService {
             
             Best regards,
             The Footwork Team
-            
-            © 2024 Footwork. All rights reserved.
             """.formatted(code);
     }
 }

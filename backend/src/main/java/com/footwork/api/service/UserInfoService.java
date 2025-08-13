@@ -22,11 +22,6 @@ import com.footwork.api.repository.UserInfoRepository;
 import com.footwork.api.repository.DailyPlanRepository;
 import com.footwork.api.repository.PlanDrillRepository;
 import com.footwork.api.entity.UserProfileResponse;
-import com.footwork.api.service.JwtService;
-import com.footwork.api.service.PlanGenerationService;
-import com.footwork.api.service.S3StorageService;
-import com.footwork.api.service.TokenRevocationService;
-import com.footwork.api.service.EmailVerificationService;
 
 @Service
 public class UserInfoService implements UserDetailsService {
@@ -226,7 +221,7 @@ public class UserInfoService implements UserDetailsService {
       user.getPrimaryPosition(),
       user.isProfileCompleted(),
       user.getProfileImageUrl(),
-      user.getStreak(),
+      getCurrentStreak(user), // Use current streak calculation that accounts for missed days
       user.getLastCompletedDate() != null ? user.getLastCompletedDate().toString() : null,
       user.isEmailVerified(),
       user.getEmailVerifiedAt() != null ? user.getEmailVerifiedAt().toString() : null
@@ -266,5 +261,120 @@ public class UserInfoService implements UserDetailsService {
     }
     
     repository.save(user);
+  }
+
+  /**
+   * Check and reset broken streaks for all users
+   * This method should be called daily to ensure streaks are accurate
+   */
+  @Transactional
+  public void checkAndResetBrokenStreaks() {
+    LocalDate today = LocalDate.now();
+    List<UserInfo> allUsers = repository.findAll();
+    
+    for (UserInfo user : allUsers) {
+      if (user.getLastCompletedDate() != null && user.getStreak() != null && user.getStreak() > 0) {
+        // Calculate days since last completion
+        long daysSinceLastCompletion = user.getLastCompletedDate().until(today).getDays();
+        
+        // If more than 1 day has passed since last completion, streak is broken
+        if (daysSinceLastCompletion > 1) {
+          user.setStreak(0);
+          repository.save(user);
+        }
+      }
+    }
+  }
+
+  /**
+   * Get the current streak for a user, accounting for missed days
+   * This method automatically updates the database if the stored value differs from calculated value
+   */
+  public int getCurrentStreak(UserInfo user) {
+    if (user.getLastCompletedDate() == null || user.getStreak() == null) {
+      return 0;
+    }
+    
+    LocalDate today = LocalDate.now();
+    long daysSinceLastCompletion = user.getLastCompletedDate().until(today).getDays();
+    
+    // Calculate what the streak should be
+    int calculatedStreak;
+    if (daysSinceLastCompletion > 1) {
+      // Streak is broken - more than 1 day missed
+      calculatedStreak = 0;
+    } else if (daysSinceLastCompletion == 1) {
+      // Only 1 day missed - streak can continue
+      calculatedStreak = user.getStreak();
+    } else {
+      // Same day or 0 days - streak continues
+      calculatedStreak = user.getStreak();
+    }
+    
+    // If there's a discrepancy, update the database
+    if (calculatedStreak != user.getStreak()) {
+      logger.info("Streak discrepancy detected for user " + user.getEmail() + 
+                 ": stored=" + user.getStreak() + ", calculated=" + calculatedStreak + 
+                 ", days since completion=" + daysSinceLastCompletion);
+      
+      // Update the database to reflect the current reality
+      user.setStreak(calculatedStreak);
+      repository.save(user);
+      
+      logger.info("Database updated: streak changed from " + user.getStreak() + " to " + calculatedStreak);
+    }
+    
+    return calculatedStreak;
+  }
+
+  /**
+   * Get the current streak for a user without updating the database
+   * Use this for read-only operations where you don't want to modify the database
+   */
+  public int getCurrentStreakReadOnly(UserInfo user) {
+    if (user.getLastCompletedDate() == null || user.getStreak() == null) {
+      return 0;
+    }
+    
+    LocalDate today = LocalDate.now();
+    long daysSinceLastCompletion = user.getLastCompletedDate().until(today).getDays();
+    
+    // Calculate what the streak should be
+    if (daysSinceLastCompletion > 1) {
+      // Streak is broken - more than 1 day missed
+      return 0;
+    } else {
+      // Streak can continue
+      return user.getStreak();
+    }
+  }
+
+  /**
+   * Manually sync all user streaks in the database
+   * This ensures all stored streak values match their calculated values
+   * Useful for admin operations or after system updates
+   */
+  @Transactional
+  public int syncAllUserStreaks() {
+    List<UserInfo> allUsers = repository.findAll();
+    int updatedCount = 0;
+    
+    for (UserInfo user : allUsers) {
+      if (user.getLastCompletedDate() != null && user.getStreak() != null) {
+        int calculatedStreak = getCurrentStreakReadOnly(user);
+        
+        if (calculatedStreak != user.getStreak()) {
+          logger.info("Syncing streak for user " + user.getEmail() + 
+                     ": " + user.getStreak() + " → " + calculatedStreak);
+          
+          user.setStreak(calculatedStreak);
+          repository.save(user);
+          updatedCount++;
+        }
+      }
+    }
+    
+    logger.info("Streak sync completed: " + updatedCount + " users updated");
+    return updatedCount;
   }
 }

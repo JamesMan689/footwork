@@ -35,6 +35,8 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.logging.Logger;
 import java.util.Date;
 import java.util.Map;
+import jakarta.servlet.http.HttpServletRequest;
+import java.util.HashMap;
 
 @RestController
 @RequestMapping("/api")
@@ -193,42 +195,36 @@ public class UserController {
     }
 
     @PostMapping("/auth/logout")
-    public ResponseEntity<String> logout(@RequestHeader("Authorization") String refreshToken) {
-        logger.info("Logout endpoint called with token: " + (refreshToken != null ? refreshToken.substring(0, Math.min(20, refreshToken.length())) + "..." : "null"));
+    public ResponseEntity<String> logout(@RequestHeader("Authorization") String authHeader) {
+        logger.info("Logout endpoint called with token: " + (authHeader != null ? authHeader.substring(0, Math.min(20, authHeader.length())) + "..." : "null"));
         
-        if (refreshToken == null || !refreshToken.startsWith("Bearer ")) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             logger.warning("Logout called without valid Authorization header");
             return ResponseEntity.badRequest().body("Authorization header required");
         }
         
-        String token = refreshToken.substring(7);
+        String token = authHeader.substring(7);
         
         try {
-            // First check if this is actually a refresh token
-            if (!jwtService.isRefreshToken(token)) {
-                logger.warning("Logout attempted with non-refresh token");
-                return ResponseEntity.badRequest().body("Only refresh tokens are accepted for logout");
-            }
-            
-            // Validate the refresh token
+            // Extract email from token (works for both access and refresh tokens)
             String email = jwtService.extractUsername(token);
             if (email == null) {
-                logger.warning("Invalid refresh token: could not extract email");
-                return ResponseEntity.badRequest().body("Invalid refresh token");
+                logger.warning("Invalid token: could not extract email");
+                return ResponseEntity.badRequest().body("Invalid token");
             }
             
             // Check if token is expired
             Date expiration = jwtService.extractExpiration(token);
             if (expiration.before(new Date())) {
-                logger.warning("Refresh token expired for user: " + email);
-                return ResponseEntity.badRequest().body("Refresh token expired");
+                logger.warning("Token expired for user: " + email);
+                return ResponseEntity.badRequest().body("Token expired");
             }
             
             // Load user details to validate the token
             UserDetails userDetails = userDetailsService.loadUserByUsername(email);
             if (!jwtService.validateToken(token, userDetails)) {
-                logger.warning("Invalid refresh token: validation failed for user: " + email);
-                return ResponseEntity.badRequest().body("Invalid refresh token");
+                logger.warning("Invalid token: validation failed for user: " + email);
+                return ResponseEntity.badRequest().body("Invalid token");
             }
             
             // Check if token is already revoked
@@ -237,15 +233,110 @@ public class UserController {
                 return ResponseEntity.ok("Logout successful");
             }
             
-            // Revoke the refresh token
-            tokenRevocationService.revokeToken(token);
-            logger.info("Token revoked successfully for user: " + email);
+            // Revoke ALL tokens for this user to ensure complete logout
+            tokenRevocationService.revokeAllUserTokensOnLogout(email);
+            logger.info("All tokens revoked successfully for user: " + email);
             
             return ResponseEntity.ok("Logout successful");
             
         } catch (Exception e) {
             logger.warning("Error during logout: " + e.getMessage());
-            return ResponseEntity.badRequest().body("Invalid refresh token");
+            return ResponseEntity.badRequest().body("Invalid token");
+        }
+    }
+
+    /**
+     * Logout endpoint specifically for access tokens
+     * This allows users to logout using their current access token
+     */
+    @PostMapping("/auth/logout-access")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<String> logoutAccessToken(HttpServletRequest request) {
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String email = authentication.getName();
+            
+            // Revoke ALL tokens for this user to ensure complete logout
+            tokenRevocationService.revokeAllUserTokensOnLogout(email);
+            logger.info("All tokens revoked successfully for user: " + email);
+            
+            return ResponseEntity.ok("Logout successful - Access token revoked");
+            
+        } catch (Exception e) {
+            logger.warning("Error during access token logout: " + e.getMessage());
+            return ResponseEntity.badRequest().body("Logout failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Force logout for a specific user (admin only)
+     * This revokes all active tokens for the specified user
+     */
+    @PostMapping("/admin/force-logout")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<String> forceLogoutUser(@RequestParam String userEmail) {
+        try {
+            // Revoke all tokens for the specified user
+            tokenRevocationService.revokeAllTokensForUser(userEmail);
+            logger.info("Force logout completed for user: " + userEmail);
+            
+            return ResponseEntity.ok("Force logout successful for user: " + userEmail);
+            
+        } catch (Exception e) {
+            logger.warning("Error during force logout: " + e.getMessage());
+            return ResponseEntity.badRequest().body("Force logout failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Debug endpoint to show token status for the current user
+     * This helps verify that tokens are properly tracked and revoked
+     */
+    @GetMapping("/user/token-status")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<Map<String, Object>> getTokenStatus() {
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String email = authentication.getName();
+            
+            Map<String, Object> status = new HashMap<>();
+            status.put("userEmail", email);
+            status.put("activeTokens", tokenRevocationService.getActiveTokenCountForUser(email));
+            status.put("revokedTokens", tokenRevocationService.getRevokedTokenCountForUser(email));
+            status.put("totalTrackedTokens", tokenRevocationService.getActiveTokenCountForUser(email) + 
+                                      tokenRevocationService.getRevokedTokenCountForUser(email));
+            
+            return ResponseEntity.ok(status);
+            
+        } catch (Exception e) {
+            logger.warning("Error getting token status: " + e.getMessage());
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    /**
+     * Admin endpoint to manually sync all user streaks
+     * This ensures database values match calculated values
+     */
+    @PostMapping("/admin/sync-streaks")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Map<String, Object>> syncAllStreaks() {
+        try {
+            int updatedCount = service.syncAllUserStreaks();
+            
+            Map<String, Object> result = new HashMap<>();
+            result.put("message", "Streak sync completed successfully");
+            result.put("usersUpdated", updatedCount);
+            
+            return ResponseEntity.ok(result);
+            
+        } catch (Exception e) {
+            logger.warning("Error during streak sync: " + e.getMessage());
+            
+            Map<String, Object> error = new HashMap<>();
+            error.put("error", "Streak sync failed: " + e.getMessage());
+            
+            return ResponseEntity.badRequest().body(error);
         }
     }
 
@@ -366,13 +457,31 @@ public class UserController {
             }
             
             StreakResponse response = new StreakResponse();
-            response.setStreak(user.getStreak() != null ? user.getStreak() : 0);
-            response.setMessage("Current streak: " + response.getStreak() + " days");
+            // Use the new method that properly accounts for missed days
+            int currentStreak = service.getCurrentStreak(user);
+            response.setStreak(currentStreak);
+            response.setMessage("Current streak: " + currentStreak + " days");
             
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             logger.warning("Get streak error: " + e.getMessage());
             return ResponseEntity.badRequest().build();
+        }
+    }
+
+    /**
+     * Manual endpoint to trigger streak check (for testing purposes)
+     * This will check and reset broken streaks for all users
+     */
+    @PostMapping("/admin/check-streaks")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<String> checkStreaks() {
+        try {
+            service.checkAndResetBrokenStreaks();
+            return ResponseEntity.ok("Streak check completed successfully");
+        } catch (Exception e) {
+            logger.warning("Streak check error: " + e.getMessage());
+            return ResponseEntity.badRequest().body("Streak check failed: " + e.getMessage());
         }
     }
 

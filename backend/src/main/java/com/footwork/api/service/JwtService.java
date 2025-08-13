@@ -27,12 +27,22 @@ public class JwtService {
 
     public String generateToken(String email) { // Use email as username
         Map<String, Object> claims = new HashMap<>();
-        return createToken(claims, email);
+        String token = createToken(claims, email);
+        
+        // Track the user-token mapping for revocation purposes
+        tokenRevocationService.trackTokenForUser(token, email);
+        
+        return token;
     }
 
     public String generateRefreshToken(String email) {
         Map<String, Object> claims = new HashMap<>();
-        return createRefreshToken(claims, email);
+        String token = createRefreshToken(claims, email);
+        
+        // Track the user-token mapping for revocation purposes
+        tokenRevocationService.trackTokenForUser(token, email);
+        
+        return token;
     }
 
     private String createToken(Map<String, Object> claims, String email) {
