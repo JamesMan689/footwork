@@ -3,6 +3,7 @@ package com.footwork.api.controller;
 import com.footwork.api.entity.AuthRequest;
 import com.footwork.api.entity.AuthResponse;
 import com.footwork.api.entity.UserInfo;
+import com.footwork.api.entity.RegistrationRequest;
 import com.footwork.api.entity.ProfileSetupRequest;
 import com.footwork.api.entity.ProfileSetupResponse;
 import com.footwork.api.entity.UserProfileResponse;
@@ -31,6 +32,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import jakarta.validation.Valid;
 
 import java.util.logging.Logger;
 import java.util.Date;
@@ -121,8 +123,36 @@ public class UserController {
     }
 
     @PostMapping("/auth/register")
-    public String register(@RequestBody UserInfo userInfo) {
-        return service.addUser(userInfo);
+    public ResponseEntity<String> register(@Valid @RequestBody RegistrationRequest request) {
+        try {
+            // Create UserInfo from the validated request
+            UserInfo userInfo = new UserInfo();
+            userInfo.setName(request.getName());
+            userInfo.setEmail(request.getEmail());
+            userInfo.setPassword(request.getPassword());
+            
+            // Set role with validation - default to ROLE_USER, only allow ROLE_ADMIN if explicitly specified
+            String requestedRole = request.getRoles();
+            if (requestedRole != null && requestedRole.equals("ROLE_ADMIN")) {
+                // Only allow ROLE_ADMIN if explicitly requested (you might want to add admin-only logic here)
+                userInfo.setRoles("ROLE_ADMIN");
+            } else {
+                // Default to ROLE_USER for all registrations
+                userInfo.setRoles("ROLE_USER");
+            }
+            
+            // Set default values
+            userInfo.setProfileCompleted(false);
+            userInfo.setEmailVerified(false);
+            userInfo.setStreak(0);
+            
+            String result = service.addUser(userInfo);
+            return ResponseEntity.ok(result);
+            
+        } catch (Exception e) {
+            logger.severe("Registration failed: " + e.getMessage());
+            return ResponseEntity.badRequest().body("Registration failed: " + e.getMessage());
+        }
     }
 
     @PostMapping("/auth/login")
