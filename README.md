@@ -7,7 +7,6 @@ Footwork is a mobile and web application that delivers **personalized soccer tra
 We use **Amazon Simple Email Service (SES)** exclusively for **transactional emails**, including:
 - **Account verification emails** during signup
 - **Password reset emails** upon user request
-- **Security notifications** related to account access
 
 We **do not** send marketing or promotional emails through SES.  
 All recipients are registered users who have explicitly created accounts on our platform.
@@ -15,9 +14,7 @@ All recipients are registered users who have explicitly created accounts on our 
 ## Email Sending Setup
 - **Region:** `us-east-2`
 - **Domain:** `getfootwork.app` (DKIM, SPF, and DMARC configured)
-- **Bounce/Complaint Handling:** Processed via Amazon SNS with automatic suppression of invalid or problematic addresses
 - **From Address:** `no-reply@getfootwork.app`
-- **Reply-To Address:** `support@getfootwork.app`
 
 ## Application Features
 - Drill library with filters by position, category, and difficulty
